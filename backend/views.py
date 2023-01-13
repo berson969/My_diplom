@@ -203,7 +203,7 @@ class ProductInfoView(APIView):
         if category_id:
             query = query & Q(product__category_id=category_id)
 
-        # фильтруем и отбрасываем дуликаты
+        # фильтруем и отбрасываем дубликаты
         queryset = ProductInfo.objects.filter(
             query).select_related(
             'shop', 'product__category').prefetch_related(
@@ -238,15 +238,20 @@ class BasketView(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         items_sting = request.data.get('items')
+        # print('items_string', items_sting)
+        # print('request.dat', request.data)
         if items_sting:
             try:
                 items_dict = load_json(items_sting)
+                print('items_dict', items_dict, type(items_dict))
             except ValueError:
                 JsonResponse({'Status': False, 'Errors': 'Неверный формат запроса'})
             else:
                 basket, _ = Order.objects.get_or_create(user_id=request.user.id, state='basket')
+                print('basket', basket.id, _)
                 objects_created = 0
                 for order_item in items_dict:
+                    print('order_item', order_item)
                     order_item.update({'order': basket.id})
                     serializer = OrderItemSerializer(data=order_item)
                     if serializer.is_valid():
@@ -272,6 +277,7 @@ class BasketView(APIView):
         items_sting = request.data.get('items')
         if items_sting:
             items_list = items_sting.split(',')
+            # print('items_list', items_list)
             basket, _ = Order.objects.get_or_create(user_id=request.user.id, state='basket')
             query = Q()
             objects_deleted = False
@@ -487,7 +493,7 @@ class ContactView(APIView):
 
 class OrderView(APIView):
     """
-    Класс для получения и размешения заказов пользователями
+    Класс для получения и размещения заказов пользователями
     """
 
     # получить мои заказы
@@ -516,7 +522,7 @@ class OrderView(APIView):
                         contact_id=request.data['contact'],
                         state='new')
                 except IntegrityError as error:
-                    print(error)
+                    # print(error)
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
