@@ -1,9 +1,16 @@
+tests/partners/
+tests/shops
+tests/users
+aaa.py
+reference/*
+.env.prod
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 .idea/
-aaa.py
+
 # C extensions
 *.so
 

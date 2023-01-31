@@ -18,4 +18,4 @@ APARTMENT = os.getenv('APARTMENT', '196')
 PHONE = os.getenv('PHONE', '+7 (423) 279-05-64')
 
 URL = os.getenv('URL', 'https://raw.githubusercontent.com/netology-code/pd-diplom/master/data/shop1.yaml')
-A = 1
+

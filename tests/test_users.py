@@ -58,6 +58,7 @@ class UserTests(APITestCase):
         for _ in range(count):
             self.contact['phone'] = random.randint(10000000, 99999999)
             self.client.post(reverse('backend:user-contact'), data=self.contact)
+        return Contact.objects.first().id
 
     def reset_password(self):
         self.confirm_email()
@@ -207,8 +208,8 @@ class UserTests(APITestCase):
                          ['Ensure this field has no more than 20 characters.'])
 
     def test_delete_contact(self):
-        self.add_contacts(10)
-        data = dict(items='3,4,5')
+        contact_id = self.add_contacts(10)
+        data = dict(items=f'{contact_id},{contact_id+1},{contact_id+2}')
         response = self.client.delete(reverse('backend:user-contact'),
                                       data=data,
                                       )
