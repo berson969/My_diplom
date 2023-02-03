@@ -26,7 +26,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./logs:/var/diplom_log
     env_file:
-      - ./.env.prod
+      - ./.env
     networks:
       product-network:
         aliases:
@@ -43,8 +43,9 @@ services:
       product-network:
     depends_on:
       - db
+      - celery
     env_file:
-      - ./.env.prod
+      - ./.env
     volumes:
       - ./backend/:/backend
       - ./netology_pd_diplom/:/netology_pd_diplom
@@ -73,7 +74,7 @@ services:
       networks:
         product-network:
       env_file:
-        - ./.env.prod
+        - ./.env
 
   tests:
     build:
@@ -85,33 +86,8 @@ services:
     depends_on:
       - db
       - shops
-      - redis
+      - celery
     env_file:
-      - ./.env.prod
+      - ./.env
 
-
-
-#    environment:
-#      PG_USER: ${PG_USER}
-#      PG_PASSWORD: ${PG_PASSWORD}
-#      PG_HOST: ${PG_HOST}
-#      PG_PORT: ${PG_PORT}
-#      PG_DB: ${PG_DB}
-#      API_URL: ${API_URL}
-#      DEBUG: ${DEBUG}
-#      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
-#      SECRET_KEY: ${SECRET_KEY}
-#      EMAIL_USER: ${EMAIL_USER}
-#      PASSWORD_USER1: ${PASSWORD_USER1}
-#      PASSWORD_USER2: ${PASSWORD_USER2}
-#      FIRST_NAME: ${FIRST_NAME}
-#      LAST_NAME: ${LAST_NAME}
-#      SUR_NAME: ${SUR_NAME}
-#      COMPANY: ${COMPANY}
-#      POSITION: ${POSITION}
-#      EMAIL_HOST: ${EMAIL_HOST}
-#      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
-#      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
-#      EMAIL_PORT: ${EMAIL_PORT}
-#      EMAIL_USE_SSL: ${EMAIL_USE_SSL}
 

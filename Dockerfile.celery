@@ -10,12 +10,10 @@ RUN pip3 install --no-cache-dir --upgrade -r /home/requirements.txt
 
 COPY ./backend /home/backend
 COPY ./netology_pd_diplom /home/netology_pd_diplom
-ADD ./config.py /home/
-
 
 WORKDIR /home
 
 RUN chmod +x /home/netology_pd_diplom/run_celery.sh
 
 ENTRYPOINT ["/home/netology_pd_diplom/run_celery.sh"]
-# CMD celery -A backends worker info
+# CMD celery -A netology_pd_diplom worker -l info

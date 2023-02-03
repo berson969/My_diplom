@@ -11,24 +11,21 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
-import environ
+from netology_pd_diplom import config
 
-env = environ.Env(DEBUG=(bool, True))
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+# # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = config.SECRET_KEY
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG')
+DEBUG = config.DEBUG
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(', ')
+ALLOWED_HOSTS = config.ALLOWED_HOSTS.split(', ')
 
 # Application definition
 
@@ -44,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_rest_passwordreset',
     'drf_yasg',
+    'netology_pd_diplom',
 ]
 
 MIDDLEWARE = [
@@ -82,19 +80,13 @@ WSGI_APPLICATION = 'netology_pd_diplom.wsgi.application'
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
 DATABASES = {
-
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.sqlite3',
-    #     'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    # }
-
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('PG_DB'),
-        'HOST': os.getenv('PG_HOST'),
-        'PORT': os.getenv('PG_PORT'),
-        'USER': os.getenv('PG_USER'),
-        'PASSWORD': os.getenv('PG_PASSWORD'),
+        'NAME': config.PG_DB,
+        'HOST': config.PG_HOST,
+        'PORT': config.PG_PORT,
+        'USER': config.PG_USER,
+        'PASSWORD': config.PG_PASSWORD,
     }
 }
 
@@ -139,11 +131,11 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # smtp settings
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mail.ru')
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'netology-pdiplom@mail.ru')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'i~8W4rdRPFlo')
-EMAIL_PORT = os.getenv('EMAIL_PORT', '465')
-EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'True')
+EMAIL_HOST = config.EMAIL_HOST
+EMAIL_HOST_USER = config.EMAIL_HOST_USER
+EMAIL_HOST_PASSWORD = config.EMAIL_HOST_PASSWORD
+EMAIL_PORT = config.EMAIL_PORT
+EMAIL_USE_SSL = config.EMAIL_USE_SSL
 SERVER_EMAIL = EMAIL_HOST_USER
 
 REST_FRAMEWORK = {
@@ -169,21 +161,13 @@ REST_FRAMEWORK = {
 }
 
 # Celery configuration:
-CELERY_BROKER_URL = f"redis://{os.getenv('PG_HOST')}:6379/0"
-CELERY_RESULT_BACKEND = f"redis://{os.getenv('PG_HOST')}:6379/1"
-# CELERY_ACCEPT_CONTENT = ['application/json']
-# CELERY_TASK_SERIALIZER = 'json'
-# CELERY_RESULT_SERIALIZER = 'json'
-# CELERY_RESULT_BACKEND = 'django-db'
-CELERY_CACHE_BACKEND = 'default'
-
-# django setting.
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': f"redis://{os.getenv('PG_HOST')}:6379/1",
-    }
-}
+CELERY_BROKER_URL = f"{config.REDIS_URL}/0"
+CELERY_BROKER_TRANSPORT_OPTIONS = {'visibility_timeout': 3600}
+CELERY_RESULT_BACKEND = f"{config.REDIS_URL}"
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_DEBUG = config.DEBUG
 
 # Swagger settings
 SWAGGER_SETTINGS = {

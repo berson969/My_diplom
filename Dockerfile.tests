@@ -9,8 +9,6 @@ COPY ./backend /home/backend
 COPY ./netology_pd_diplom /home/netology_pd_diplom
 COPY ./tests /home/tests
 ADD ./manage.py /home/
-ADD ./config.py /home/
-ADD ./run.sh /home/
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -18,7 +16,6 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8001
 
 WORKDIR /home
-
 
 RUN chmod +x /home/tests/run_coverage.sh
 

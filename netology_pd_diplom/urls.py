@@ -14,28 +14,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.conf.urls.static import static
-from rest_framework import permissions
 from django.contrib import admin
 from django.urls import path, include, re_path
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
-
 from netology_pd_diplom import settings
-
-# schema_view = get_schema_view(
-api_info = openapi.Info(
-      title="ShopsBackend API",
-      default_version='v1',
-      description="Документация дипломного проекта",
-      terms_of_service="https://www.google.com/policies/terms/",
-      contact=openapi.Contact(email="berson969@gmail.com"),
-   )
-
-schema_view = get_schema_view(
-    info=api_info,
-    public=True,
-    permission_classes=[permissions.AllowAny, ],
-)
+from netology_pd_diplom.swagger import schema_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),

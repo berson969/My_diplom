@@ -1,4 +1,11 @@
 import os
+import environ
+
+env = environ.Env(DEBUG=(bool, True))
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 EMAIL_USER = os.getenv('EMAIL_USER', 'root_user1@admin.ru')
 PASSWORD_USER1 = os.getenv('USER_PASSWORD1', 'qw12ertyuiop12')
@@ -17,5 +24,5 @@ BUILDING = os.getenv('BUILDING', '1')
 APARTMENT = os.getenv('APARTMENT', '196')
 PHONE = os.getenv('PHONE', '+7 (423) 279-05-64')
 
-URL = os.getenv('URL', 'https://raw.githubusercontent.com/netology-code/pd-diplom/master/data/shop1.yaml')
+URL = os.getenv('URL', 'https://github.com/berson969/My_diplom/blob/main/data/shop1.yaml')
 

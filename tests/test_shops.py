@@ -1,13 +1,18 @@
+import time
 from random import randint
-from pprint import pprint
 
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase, APIClient
 from django.urls import reverse
 
-from backend.models import User, OrderItem, ProductInfo, Contact, Order
-from tests.config import URL, FIRST_NAME, LAST_NAME, SUR_NAME, EMAIL_USER, PASSWORD_USER1, PASSWORD_USER2, COMPANY, \
-    POSITION, CITY, STREET, PHONE
+from backend.models import User, OrderItem, ProductInfo, Contact, Order, Shop, Category, Product, Parameter, \
+    ProductParameter
+from tests.config_test import URL, FIRST_NAME, LAST_NAME, SUR_NAME, EMAIL_USER,\
+    PASSWORD_USER1, PASSWORD_USER2, COMPANY, POSITION, CITY, STREET, PHONE
+
+
+import requests
+from yaml import load as load_yaml, Loader
 
 
 class ShopTests(APITestCase):
@@ -33,10 +38,40 @@ class ShopTests(APITestCase):
         token = Token.objects.create(key=f"token_{randint(100000, 999999)}", user_id=self.user.id)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+        return self.user
+
+    def create_old_shop(self):
+        self.create_user('shop')
+        response = self.client.post(reverse('backend:partner-update'), data={'url': URL})
+        # print(response.json())
+        time.sleep(1)
+        return ProductInfo.objects.first()
 
     def create_shop(self):
-        self.create_user('shop')
-        self.client.post(reverse('backend:partner-update'), data={'url': URL})
+        user = self.create_user('shop')
+        stream = requests.get(URL).content
+        data = load_yaml(stream, Loader=Loader)
+        shop, _ = Shop.objects.get_or_create(name=data['shop'], user_id=user.id)
+        for category in data['categories']:
+            category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
+            category_object.shops.add(shop.id)
+            category_object.save()
+        ProductInfo.objects.filter(shop_id=shop.id).delete()
+        for item in data['goods']:
+            product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
+
+            product_info = ProductInfo.objects.create(product_id=product.id,
+                                                      external_id=item['id'],
+                                                      model=item['model'],
+                                                      price=item['price'],
+                                                      price_rrc=item['price_rrc'],
+                                                      quantity=item['quantity'],
+                                                      shop_id=shop.id)
+            for name, value in item['parameters'].items():
+                parameter_object, _ = Parameter.objects.get_or_create(name=name)
+                ProductParameter.objects.create(product_info_id=product_info.id,
+                                                parameter_id=parameter_object.id,
+                                                value=value)
         return ProductInfo.objects.first()
 
     def add_to_basket(self):
@@ -84,6 +119,7 @@ class ShopTests(APITestCase):
 
     def test_add_to_basket(self):
         product_info = self.create_shop()
+        print('product', product_info)
         data = dict(items=f'[{{"product_info": {product_info.id}, "quantity": 1}},'
                           f'{{"product_info": {product_info.id+1}, "quantity": 1}}]'
                     )

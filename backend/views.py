@@ -1,33 +1,25 @@
-import http.client
 from distutils.util import strtobool
-from pprint import pprint
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import IntegrityError
-from django.db.models import Q, Sum, F, Value, Subquery
+from django.db.models import Q, Sum, F
 from django.http import JsonResponse
 from django_rest_passwordreset.views import ResetPasswordConfirm
-from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from requests import get
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, parser_classes
 from rest_framework.generics import ListAPIView
-from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from ujson import loads as load_json
-from yaml import load as load_yaml, Loader
 
-from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
-    Contact, ConfirmEmailToken
+from backend.models import Shop, Category, ProductInfo, Order, OrderItem, Contact, ConfirmEmailToken
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
     OrderItemSerializer, OrderSerializer, ContactSerializer
-from backend.signals import new_user_registered
-from netology_pd_diplom.app_celery import send_order
+from .signals import new_user_registered
+from .tasks import send_order, get_import
 
 
 class RegisterAccount(APIView):
@@ -268,18 +260,18 @@ class BasketView(APIView):
         # print(serializer.data)
         return Response(serializer.data)
 
-    @swagger_auto_schema(
-        operation_summary='Add items to basket',
-        # request_body=OrderItemSerializer,
-        request_body=openapi.Schema(
-            in_=openapi.IN_FORM,
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'items': openapi.Schema(type=openapi.TYPE_STRING, description='product_info and quantity')
-            },
-            default={'items': "[{\"product_info\": 2, \"quantity\": 1}, {\"product_info\": 3, \"quantity\": 2}]"},
-        ),
-    )
+    # @swagger_auto_schema(
+    #     operation_summary='Add items to basket',
+    #     # request_body=OrderItemSerializer,
+    #     request_body=openapi.Schema(
+    #         in_=openapi.IN_FORM,
+    #         type=openapi.TYPE_OBJECT,
+    #         properties={
+    #             'items': openapi.Schema(type=openapi.TYPE_STRING, description='product_info and quantity')
+    #         },
+    #         default={'items': "[{\"product_info\": 2, \"quantity\": 1}, {\"product_info\": 3, \"quantity\": 2}]"},
+    #     ),
+    # )
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Login required'}, status=403)
@@ -318,9 +310,9 @@ class BasketView(APIView):
                 return JsonResponse({'Status': True, 'Создано объектов': objects_created})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
-    @swagger_auto_schema(
-        operation_description='Удаление продуктов из корзины',
-        request_body=OrderItemSerializer)
+    # @swagger_auto_schema(
+    #     operation_description='Удаление продуктов из корзины',
+    #     request_body=OrderItemSerializer)
     def delete(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -342,9 +334,9 @@ class BasketView(APIView):
                 return JsonResponse({'Status': True, 'Удалено объектов': deleted_count})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
-    @swagger_auto_schema(
-        operation_description='Добавление новых позиций в корзину',
-        request_body=OrderItemSerializer)
+    # @swagger_auto_schema(
+    #     operation_description='Добавление новых позиций в корзину',
+    #     request_body=OrderItemSerializer)
     def put(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -387,32 +379,7 @@ class PartnerUpdate(APIView):
             except ValidationError as e:
                 return JsonResponse({'Status': False, 'Error': str(e)})
             else:
-                stream = get(url).content
-
-                data = load_yaml(stream, Loader=Loader)
-
-                shop, _ = Shop.objects.get_or_create(name=data['shop'], user_id=request.user.id)
-                for category in data['categories']:
-                    category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
-                    category_object.shops.add(shop.id)
-                    category_object.save()
-                ProductInfo.objects.filter(shop_id=shop.id).delete()
-                for item in data['goods']:
-                    product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
-
-                    product_info = ProductInfo.objects.create(product_id=product.id,
-                                                              external_id=item['id'],
-                                                              model=item['model'],
-                                                              price=item['price'],
-                                                              price_rrc=item['price_rrc'],
-                                                              quantity=item['quantity'],
-                                                              shop_id=shop.id)
-                    for name, value in item['parameters'].items():
-                        parameter_object, _ = Parameter.objects.get_or_create(name=name)
-                        ProductParameter.objects.create(product_info_id=product_info.id,
-                                                        parameter_id=parameter_object.id,
-                                                        value=value)
-
+                get_import.delay(url=url, user_id=request.user.id)
                 return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
@@ -581,19 +548,11 @@ class OrderView(APIView):
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
-                        send_order.apply_async(args=[request.user.id, f"Заказ {request.data['id']} сформирован"])
-
-
-                        #     dict(
-                        #     user_id=request.user.id,
-                        #     message=f"Заказ {request.data['id']} сформирован"),
-                        #     countdown=10
-                        # )
-
-                        # send_order.send(sender=self.__class__,
-                        #                 user_id=request.user.id,
-                        #                 message=f"Заказ {request.data['id']} сформирован"
-                        #                 )
+                        # send_order.delay(args=[request.user.id, f"Заказ {request.data['id']} сформирован"])
+                        send_order.delay(
+                            user_id=request.user.id,
+                            message=f"Заказ {request.data['id']} сформирован"
+                        )
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
@@ -614,9 +573,7 @@ class OrderView(APIView):
                 ).distinct()
                 error_quantity = {}
                 for order in orders:
-
                     if order.update_quantity < 0:
-                        # print(order.product_name)
                         error_quantity[order.product_name] = f'Не хватает {abs(order.update_quantity)} штук'
                 if error_quantity:
                     return JsonResponse({'Status': False, 'Errors': error_quantity})
@@ -628,12 +585,12 @@ class OrderView(APIView):
                     # print(error)
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
-                    # print(is_updated)
                     if is_updated:
-                        # send_order.send(sender=self.__class__,
-                        #                 user_id=order.user_id,
-                        #                 message=f"Заказ {request.data['id']} подтвержден"
-                        #                 )
+                        send_order.delay(
+                            user_id=request.user.id,
+                            message=f"Заказ {request.data['id']} подтвержден"
+                        )
+
                         return JsonResponse({'Status': True})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
@@ -657,10 +614,10 @@ class StorageAdminView(APIView):
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
-                        # send_order.send(sender=self.__class__,
-                        #                 user_id=order.user_id,
-                        #                 message=f"Заказ {order.id} собран"
-                        #                 )
+                        send_order.delay(
+                            user_id=request.user.id,
+                            message=f"Заказ {order.id} собран"
+                        )
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
@@ -676,8 +633,8 @@ class StorageAdminView(APIView):
                     is_updated = Order.objects.filter(
                         id=request.data['id'], state='assembled') \
                         .prefetch_related('ordered_items__product_info') \
-                        .annotate(product_quantity=
-                                  F('ordered_items__product_info__quantity') - F('ordered_items__quantity'),
+                        .annotate(product_quantity=F('ordered_items__product_info__quantity') -
+                                                   F('ordered_items__quantity'),
                                   product_id=F('ordered_items__product_info_id')
                                   )
                     for updated in is_updated:
@@ -691,10 +648,10 @@ class StorageAdminView(APIView):
                     if is_updated:
                         Order.objects.filter(
                             id=request.data['id'], state='assembled').update(state='sent')
-                        # send_order.send(sender=self.__class__,
-                        #                 user_id=is_updated[0].user_id,
-                        #                 message=f"Заказ {request.data['id']} отправлен"
-                        #                 )
+                        send_order.delay(
+                            user_id=request.user.id,
+                            message=f"Заказ {request.data['id']} отправлен"
+                        )
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
@@ -715,10 +672,10 @@ class StorageAdminView(APIView):
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
-                        # send_order.send(sender=self.__class__,
-                        #                 user_id=request.user.id,
-                        #                 message=f"Заказ {request.data['id']} доставлен"
-                        #                 )
+                        send_order.delay(
+                            user_id=request.user.id,
+                            message=f"Заказ {request.data['id']} доставлен"
+                        )
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
@@ -739,10 +696,10 @@ class StorageAdminView(APIView):
                         return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                     else:
                         if is_updated:
-                            # send_order.send(sender=self.__class__,
-                            #                 user_id=order.user_id,
-                            #                 message=f"Заказ {request.data['id']} отменен"
-                            #                 )
+                            send_order.delay(
+                                user_id=request.user.id,
+                                message=f"Заказ {request.data['id']} отменен"
+                            )
                             return JsonResponse({'Status': True})
                 return JsonResponse({'Status': False, 'Errors': 'Данный заказ нельзя отменить'})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
