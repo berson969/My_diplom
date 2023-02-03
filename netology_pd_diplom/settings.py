@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'django_rest_passwordreset',
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [
@@ -134,10 +135,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
-
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-
 
 # smtp settings
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mail.ru')
@@ -162,4 +161,40 @@ REST_FRAMEWORK = {
         # 'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ),
+
+    # 'DEFAULT_PERMISSION_CLASSES': (
+    #     'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
+    # )
+
+}
+
+# Celery configuration:
+CELERY_BROKER_URL = f"redis://{os.getenv('PG_HOST')}:6379/0"
+CELERY_RESULT_BACKEND = f"redis://{os.getenv('PG_HOST')}:6379/1"
+# CELERY_ACCEPT_CONTENT = ['application/json']
+# CELERY_TASK_SERIALIZER = 'json'
+# CELERY_RESULT_SERIALIZER = 'json'
+# CELERY_RESULT_BACKEND = 'django-db'
+CELERY_CACHE_BACKEND = 'default'
+
+# django setting.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': f"redis://{os.getenv('PG_HOST')}:6379/1",
+    }
+}
+
+# Swagger settings
+SWAGGER_SETTINGS = {
+    'DEFAULT_INFO': 'netology_pd_diplom.urls.api_info',
+    'USE_SESSION_AUTH': False,
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        },
+
+    },
 }

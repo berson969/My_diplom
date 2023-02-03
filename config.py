@@ -11,3 +11,6 @@ PG_DSN = os.getenv("PG_DSN", f"postgresql+psycopg2://{PG_USER}:{PG_PASSWORD}@{PG
 SECRET_KEY = os.getenv("SECRET_KEY", "fjk3ghg1hr3ke@kfl3j3afk23485968456bj3vbj5460mv")
 DEBUG = os.getenv("DEBUG", True)
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1, ")
+
+CELERY_BROKER = f"redis://{PG_HOST}:6379/1"
+CELERY_BACKEND = f"redis://{PG_HOST}:6379/2"

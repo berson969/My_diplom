@@ -218,6 +218,14 @@ class UserTests(APITestCase):
         self.assertEqual(response.json()['Status'], True)
         self.assertEqual(response.json()['Удалено объектов'], 3)
 
+    def test_get_contacts(self):
+        self.add_contacts(5)
+        response = self.client.get(reverse('backend:user-contact'))
+        # print('response', response.json())
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.json(), list)
+        self.assertEqual(len(response.json()), 5)
+
     def test_delete_not_exists_contact(self):
         self.add_contacts(5)
         data = dict(items='6,7')
