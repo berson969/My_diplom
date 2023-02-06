@@ -137,7 +137,7 @@ class AccountDetails(APIView):
 
     # Редактирование методом POST
     @swagger_auto_schema(
-        operation_description='Редактирование users',
+        operation_summary='Редактирование users',
         request_body=UserSerializer)
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:

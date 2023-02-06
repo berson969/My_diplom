@@ -1,6 +1,7 @@
 tests/partners/
 tests/shops
 tests/users
+tests/cached/
 aaa.py
 reference/
 .env.prod

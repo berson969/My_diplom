@@ -36,7 +36,7 @@ services:
     networks:
       product-network:
 
-  shops:
+  shops-app:
     build:
       context: .
       dockerfile: Dockerfile
@@ -82,10 +82,8 @@ services:
     container_name: diplom_tests
     networks:
       product-network:
-    depends_on:
-      - db
-      - shops
-      - celery
+    environment:
+      WAIT_HOSTS: db:${PG_PORT}, redis:6379, shops-app:8001
     env_file:
       - ./.env
     volumes:
