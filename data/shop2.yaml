@@ -23,22 +23,22 @@ goods:
   - id: 4216313
     category: 224
     model: apple/iphone/xr
-    name: Смартфон Apple iPhone XR 256GB (красный)
+    name: Смартфон Apple iPhone XR 256GB (серебряный)
     price: 65000
     price_rrc: 69990
-    quantity: 9
+    quantity: 15
     parameters:
       "Диагональ (дюйм)": 6.1
       "Разрешение (пикс)": 1792x828
       "Встроенная память (Гб)": 256
-      "Цвет": красный
+      "Цвет": серебряный
   - id: 4216226
     category: 224
     model: apple/iphone/xr
     name: Смартфон Apple iPhone XR 256GB (черный)
     price: 65000
     price_rrc: 69990
-    quantity: 5
+    quantity: 15
     parameters:
       "Диагональ (дюйм)": 6.1
       "Разрешение (пикс)": 1792x828
@@ -47,12 +47,12 @@ goods:
   - id: 4672670
     category: 224
     model: apple/iphone/xr
-    name: Смартфон Apple iPhone XR 128GB (синий)
+    name: Смартфон Apple iPhone XR 128GB (золотой)
     price: 60000
     price_rrc: 64990
-    quantity: 7
+    quantity: 15
     parameters:
       "Диагональ (дюйм)": 6.1
       "Разрешение (пикс)": 1792x828
       "Встроенная память (Гб)": 256
-      "Цвет": синий
+      "Цвет": золотой

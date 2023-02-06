@@ -15,11 +15,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ujson import loads as load_json
 
-from backend.models import Shop, Category, ProductInfo, Order, OrderItem, Contact, ConfirmEmailToken
+from backend.models import User, Shop, Category, ProductInfo, Order, OrderItem, Contact, ConfirmEmailToken
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
     OrderItemSerializer, OrderSerializer, ContactSerializer
-from .signals import new_user_registered
-from .tasks import send_order, get_import
+from backend.signals import new_user_registered
+from backend.tasks import send_order, get_price
+
+#  для использования без Celery
+import requests
+from yaml import load as load_yaml, Loader
+from backend.models import Product, Parameter, ProductParameter
 
 
 class RegisterAccount(APIView):
@@ -58,7 +63,7 @@ class RegisterAccount(APIView):
 
             # проверяем совпадение паролей
             if request.data['password1'] != request.data['password2']:
-                return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'})
+                return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'}, status=400)
             request.data._mutable = True
             request.data['password'] = request.data['password1']
 
@@ -92,7 +97,7 @@ class PasswordConfirm(ResetPasswordConfirm):
     def post(self, request, *args, **kwargs):
         # проверяем совпадение паролей
         if request.data['password1'] != request.data['password2']:
-            return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'})
+            return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'}, status=400)
         request.data._mutable = True
         request.data['password'] = request.data['password1']
         return ResetPasswordConfirm.post(self, request, *args, **kwargs)
@@ -144,12 +149,11 @@ class AccountDetails(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         # проверяем обязательные аргументы
-        if 'password' in request.data:
-            errors = {}
+        if {'password1', 'password2'}.issubset(request.data):
 
             # проверяем совпадение паролей
             if request.data['password1'] != request.data['password2']:
-                return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'})
+                return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'}, status=400)
             request.data._mutable = True
             request.data['password'] = request.data['password1']
 
@@ -172,7 +176,7 @@ class AccountDetails(APIView):
             user_serializer.save()
             return JsonResponse({'Status': True})
         else:
-            return JsonResponse({'Status': False, 'Errors': user_serializer.errors})
+            return JsonResponse({'Status': False, 'Errors': user_serializer.errors}, status=400)
 
 
 class LoginAccount(APIView):
@@ -192,7 +196,7 @@ class LoginAccount(APIView):
 
                     return JsonResponse({'Status': True, 'Token': token.key})
 
-            return JsonResponse({'Status': False, 'Errors': 'Не удалось авторизовать'})
+            return JsonResponse({'Status': False, 'Errors': 'Не удалось авторизовать'}, status=403)
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 
@@ -257,7 +261,6 @@ class BasketView(APIView):
             total_sum=Sum(F('ordered_items__quantity') * F('ordered_items__product_info__price'))).distinct()
 
         serializer = OrderSerializer(basket, many=True)
-        # print(serializer.data)
         return Response(serializer.data)
 
     # @swagger_auto_schema(
@@ -277,23 +280,17 @@ class BasketView(APIView):
             return JsonResponse({'Status': False, 'Error': 'Login required'}, status=403)
 
         items_sting = request.data.get('items')
-        # print('items_string', items_sting)
-        # print('request.dat', request.data)
         if items_sting:
             try:
                 items_dict = load_json(items_sting)
-                # print('items_dict', items_dict, type(items_dict))
             except ValueError:
                 JsonResponse({'Status': False, 'Errors': 'Неверный формат запроса'})
             else:
                 basket, _ = Order.objects.get_or_create(user_id=request.user.id, state='basket')
-                # print('basket', basket.id, _)
                 objects_created = 0
                 for order_item in items_dict:
-                    # print('order_item', order_item)
                     order_item.update({'order': basket.id})
                     serializer = OrderItemSerializer(data=order_item)
-                    # print('serializer', serializer.errors)
                     if serializer.is_valid():
                         try:
                             serializer.save()
@@ -320,7 +317,6 @@ class BasketView(APIView):
         items_sting = request.data.get('items')
         if items_sting:
             items_list = items_sting.split(',')
-            # print('items_list', items_list)
             basket, _ = Order.objects.get_or_create(user_id=request.user.id, state='basket')
             query = Q()
             objects_deleted = False
@@ -377,12 +373,45 @@ class PartnerUpdate(APIView):
             try:
                 validate_url(url)
             except ValidationError as e:
-                return JsonResponse({'Status': False, 'Error': str(e)})
+                return JsonResponse({'Status': False, 'Error': str(e)}, status=403)
             else:
-                get_import.delay(url=url, user_id=request.user.id)
-                return JsonResponse({'Status': True})
+                #  блок для использования без celery (без get_price)
+                stream = requests.get(url).content
+                data = load_yaml(stream, Loader=Loader)
+                shop, _ = Shop.objects.get_or_create(name=data['shop'],
+                                                     user_id=request.user.id,
+                                                     url=url
+                                                     )
 
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+                for category in data['categories']:
+                    category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
+                    category_object.shops.add(shop.id)
+                    category_object.save()
+                ProductInfo.objects.filter(shop_id=shop.id).delete()
+                for item in data['goods']:
+                    product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
+
+                    product_info = ProductInfo.objects.create(product_id=product.id,
+                                                              external_id=item['id'],
+                                                              model=item['model'],
+                                                              price=item['price'],
+                                                              price_rrc=item['price_rrc'],
+                                                              quantity=item['quantity'],
+                                                              shop_id=shop.id)
+                    for name, value in item['parameters'].items():
+                        parameter_object, _ = Parameter.objects.get_or_create(name=name)
+                        ProductParameter.objects.create(product_info_id=product_info.id,
+                                                        parameter_id=parameter_object.id,
+                                                        value=value)
+                return JsonResponse({'Status': True}, status=200)
+
+                # блок для использования в Celery
+                # job_params = {'url': url, 'user_id': request.user.id}
+                # print(User.objects.get(id=request.user.id))
+                # print(job_params)
+                # get_price.delay(job_params)
+                # return JsonResponse({'Status': True}, status=200)
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
 
 class PartnerState(APIView):
@@ -472,7 +501,7 @@ class ContactView(APIView):
             else:
                 JsonResponse({'Status': False, 'Errors': serializer.errors})
 
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
     # удалить контакт
     def delete(self, request, *args, **kwargs):
@@ -510,7 +539,7 @@ class ContactView(APIView):
                     else:
                         return JsonResponse({'Status': False, 'Errors': serializer.errors})
 
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
 
 class OrderView(APIView):
@@ -533,24 +562,30 @@ class OrderView(APIView):
 
     # разместить заказ из корзины
     def post(self, request, *args, **kwargs):
+        """
+            Add products to basket
+        """
+
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if {'id', 'contact'}.issubset(request.data):
             if request.data['id'].isdigit():
                 try:
+                    # print('order', request.data['id'], 'user', request.user.id)
+                    is_upd = Order.objects.filter(
+                        user_id=request.user.id, id=request.data['id']).first()
                     is_updated = Order.objects.filter(
                         user_id=request.user.id, id=request.data['id']).update(
                         contact_id=request.data['contact'],
                         state='new')
                 except IntegrityError as error:
                     # print(error)
-                    return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
+                    return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'}, statys=400)
                 else:
                     if is_updated:
-                        # send_order.delay(args=[request.user.id, f"Заказ {request.data['id']} сформирован"])
                         send_order.delay(
-                            user_id=request.user.id,
+                            email=request.user.email,
                             message=f"Заказ {request.data['id']} сформирован"
                         )
                         return JsonResponse({'Status': True})
@@ -587,7 +622,7 @@ class OrderView(APIView):
                 else:
                     if is_updated:
                         send_order.delay(
-                            user_id=request.user.id,
+                            email=request.user.email,
                             message=f"Заказ {request.data['id']} подтвержден"
                         )
 
@@ -615,8 +650,8 @@ class StorageAdminView(APIView):
                 else:
                     if is_updated:
                         send_order.delay(
-                            user_id=request.user.id,
-                            message=f"Заказ {order.id} собран"
+                            email=request.user.email,
+                            message=f"Заказ {request.data['id']} собран"
                         )
                         return JsonResponse({'Status': True})
 
@@ -649,7 +684,7 @@ class StorageAdminView(APIView):
                         Order.objects.filter(
                             id=request.data['id'], state='assembled').update(state='sent')
                         send_order.delay(
-                            user_id=request.user.id,
+                            email=request.user.email,
                             message=f"Заказ {request.data['id']} отправлен"
                         )
                         return JsonResponse({'Status': True})
@@ -673,7 +708,7 @@ class StorageAdminView(APIView):
                 else:
                     if is_updated:
                         send_order.delay(
-                            user_id=request.user.id,
+                            email=request.user.email,
                             message=f"Заказ {request.data['id']} доставлен"
                         )
                         return JsonResponse({'Status': True})
@@ -697,7 +732,7 @@ class StorageAdminView(APIView):
                     else:
                         if is_updated:
                             send_order.delay(
-                                user_id=request.user.id,
+                                email=request.user.email,
                                 message=f"Заказ {request.data['id']} отменен"
                             )
                             return JsonResponse({'Status': True})

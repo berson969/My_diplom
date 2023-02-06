@@ -13,7 +13,7 @@ COPY ./netology_pd_diplom /home/netology_pd_diplom
 
 WORKDIR /home
 
-RUN chmod +x /home/netology_pd_diplom/run_celery.sh
+# RUN chmod +x /home/netology_pd_diplom/run_celery.sh
 
-ENTRYPOINT ["/home/netology_pd_diplom/run_celery.sh"]
-# CMD celery -A netology_pd_diplom worker -l info
+# ENTRYPOINT ["/home/netology_pd_diplom/run_celery.sh"]
+CMD celery -A netology_pd_diplom worker -l info --uid=0

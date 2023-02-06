@@ -1,23 +1,20 @@
 import requests
 from yaml import load as load_yaml, Loader
 
-from netology_pd_diplom import settings
-from netology_pd_diplom.celery import app
-
+from django.conf import settings
+from django.db import IntegrityError
 from django.core.mail import EmailMultiAlternatives
 
-from .models import User, Shop, Category, ProductInfo, Product, Parameter, ProductParameter
+from netology_pd_diplom.celery import app
+from backend.models import Shop, Category, ProductInfo, Product, Parameter, ProductParameter
 
 
 @app.task()
-def send_order(user_id, message, **kwargs):
+def send_order(email, message, **kwargs):
     """
     Отправление письмо при изменении статуса заказа
     """
     try:
-        # send an e-mail to the user
-        user = User.objects.get(id=user_id)
-
         msg = EmailMultiAlternatives(
             # title:
             f"Обновление статуса заказа",
@@ -26,7 +23,7 @@ def send_order(user_id, message, **kwargs):
             # from:
             settings.EMAIL_HOST_USER,
             # to:
-            [user.email]
+            [email]
         )
         msg.send()
         return f'Title: {msg.subject}, Message:{msg.body}'
@@ -34,15 +31,22 @@ def send_order(user_id, message, **kwargs):
         raise Exception
 
 
-@app.task
-def get_import(url, user_id):
-    stream = requests.get(url).content
+@app.task()
+def get_price(job_params):  # url, user_id
+    stream = requests.get(job_params['url']).content
     data = load_yaml(stream, Loader=Loader)
-    shop, _ = Shop.objects.get_or_create(name=data['shop'], user_id=user_id)
+    try:
+        shop, _ = Shop.objects.get_or_create(name=data['shop'],
+                                             user_id=job_params['user_id'],
+                                             url=job_params['url']
+                                             )
+    except IntegrityError as e:
+        return {'Status': False, 'Error': str(e)}
     for category in data['categories']:
         category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
         category_object.shops.add(shop.id)
         category_object.save()
+
     ProductInfo.objects.filter(shop_id=shop.id).delete()
     for item in data['goods']:
         product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
@@ -59,3 +63,4 @@ def get_import(url, user_id):
             ProductParameter.objects.create(product_info_id=product_info.id,
                                             parameter_id=parameter_object.id,
                                             value=value)
+    return {'Status': True}

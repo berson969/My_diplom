@@ -24,4 +24,4 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'i~8W4rdRPFlo')
 EMAIL_PORT = os.getenv('EMAIL_PORT', '465')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'True')
 
-REDIS_URL = f"redis://{PG_HOST}:6379"
+REDIS_URL = f"redis://redis:6379"
