@@ -1,9 +1,12 @@
+import requests
+from yaml import load as load_yaml, Loader
 from random import randint
 
 from rest_framework.authtoken.models import Token
 from django.urls import reverse
 
-from backend.models import User, ConfirmEmailToken, ProductInfo, Contact, Order
+from backend.models import User, ConfirmEmailToken, ProductInfo, Contact, Order, Shop, Category, Product, Parameter, \
+    ProductParameter
 from tests.config_test import URL, FIRST_NAME, LAST_NAME, SUR_NAME, EMAIL_USER, PASSWORD_USER1, \
     PASSWORD_USER2, COMPANY, POSITION, CITY, STREET, HOUSE, STRUCTURE, BUILDING, APARTMENT, PHONE
 
@@ -66,10 +69,40 @@ def reset_password(client):
     return User.objects.get(id=user.id)
 
 
+# def create_shop(client):
+#     client, user = login_user(client)
+#     client.post(reverse('backend:partner-update'), data={'url': URL})
+#     return ProductInfo.objects.select_related('shop').filter(shop_id__user_id=user.id).first(), user
+
 def create_shop(client):
-    client, user = login_user(client)
-    client.post(reverse('backend:partner-update'), data={'url': URL})
-    return ProductInfo.objects.select_related('shop').filter(shop_id__user_id=user.id).first(), user
+    _, user = login_user(client)
+    stream = requests.get(URL).content
+    data = load_yaml(stream, Loader=Loader)
+    shop, _ = Shop.objects.get_or_create(name=data['shop'],
+                                         user_id=user.id,
+                                         url=URL
+                                         )
+    for category in data['categories']:
+        category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
+        category_object.shops.add(shop.id)
+        category_object.save()
+    ProductInfo.objects.filter(shop_id=shop.id).delete()
+    for item in data['goods']:
+        product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
+
+        product_info = ProductInfo.objects.create(product_id=product.id,
+                                                  external_id=item['id'],
+                                                  model=item['model'],
+                                                  price=item['price'],
+                                                  price_rrc=item['price_rrc'],
+                                                  quantity=item['quantity'],
+                                                  shop_id=shop.id)
+        for name, value in item['parameters'].items():
+            parameter_object, _ = Parameter.objects.get_or_create(name=name)
+            ProductParameter.objects.create(product_info_id=product_info.id,
+                                            parameter_id=parameter_object.id,
+                                            value=value)
+    return ProductInfo.objects.filter(shop_id=shop.id).first(), user
 
 
 def add_orders(client):

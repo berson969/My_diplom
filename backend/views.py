@@ -15,16 +15,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ujson import loads as load_json
 
-from backend.models import User, Shop, Category, ProductInfo, Order, OrderItem, Contact, ConfirmEmailToken
+from backend.models import Shop, Category, ProductInfo, Order, OrderItem, Contact, ConfirmEmailToken
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
     OrderItemSerializer, OrderSerializer, ContactSerializer
 from backend.signals import new_user_registered
 from backend.tasks import send_order, get_price
-
-#  для использования без Celery
-import requests
-from yaml import load as load_yaml, Loader
-from backend.models import Product, Parameter, ProductParameter
 
 
 class RegisterAccount(APIView):
@@ -305,7 +300,7 @@ class BasketView(APIView):
                         JsonResponse({'Status': False, 'Errors': serializer.errors})
 
                 return JsonResponse({'Status': True, 'Создано объектов': objects_created})
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
     # @swagger_auto_schema(
     #     operation_description='Удаление продуктов из корзины',
@@ -328,7 +323,7 @@ class BasketView(APIView):
             if objects_deleted:
                 deleted_count = OrderItem.objects.filter(query).delete()[0]
                 return JsonResponse({'Status': True, 'Удалено объектов': deleted_count})
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
     # @swagger_auto_schema(
     #     operation_description='Добавление новых позиций в корзину',
@@ -352,7 +347,7 @@ class BasketView(APIView):
                             quantity=order_item['quantity'])
 
                 return JsonResponse({'Status': True, 'Обновлено объектов': objects_updated})
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
 
 class PartnerUpdate(APIView):
@@ -365,7 +360,7 @@ class PartnerUpdate(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if request.user.type != 'shop':
-            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=405)
 
         url = request.data.get('url')
         if url:
@@ -375,42 +370,10 @@ class PartnerUpdate(APIView):
             except ValidationError as e:
                 return JsonResponse({'Status': False, 'Error': str(e)}, status=403)
             else:
-                #  блок для использования без celery (без get_price)
-                stream = requests.get(url).content
-                data = load_yaml(stream, Loader=Loader)
-                shop, _ = Shop.objects.get_or_create(name=data['shop'],
-                                                     user_id=request.user.id,
-                                                     url=url
-                                                     )
-
-                for category in data['categories']:
-                    category_object, _ = Category.objects.get_or_create(id=category['id'], name=category['name'])
-                    category_object.shops.add(shop.id)
-                    category_object.save()
-                ProductInfo.objects.filter(shop_id=shop.id).delete()
-                for item in data['goods']:
-                    product, _ = Product.objects.get_or_create(name=item['name'], category_id=item['category'])
-
-                    product_info = ProductInfo.objects.create(product_id=product.id,
-                                                              external_id=item['id'],
-                                                              model=item['model'],
-                                                              price=item['price'],
-                                                              price_rrc=item['price_rrc'],
-                                                              quantity=item['quantity'],
-                                                              shop_id=shop.id)
-                    for name, value in item['parameters'].items():
-                        parameter_object, _ = Parameter.objects.get_or_create(name=name)
-                        ProductParameter.objects.create(product_info_id=product_info.id,
-                                                        parameter_id=parameter_object.id,
-                                                        value=value)
-                return JsonResponse({'Status': True}, status=200)
-
                 # блок для использования в Celery
-                # job_params = {'url': url, 'user_id': request.user.id}
-                # print(User.objects.get(id=request.user.id))
-                # print(job_params)
-                # get_price.delay(job_params)
-                # return JsonResponse({'Status': True}, status=200)
+                job_params = {'url': url, 'user_id': request.user.id}
+                get_price.delay(job_params)
+                return JsonResponse({'Status': True}, status=200)
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
 
@@ -425,7 +388,7 @@ class PartnerState(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if request.user.type != 'shop':
-            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=405)
 
         shop = request.user.shop
         serializer = ShopSerializer(shop)
@@ -437,7 +400,7 @@ class PartnerState(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if request.user.type != 'shop':
-            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=405)
         state = request.data.get('state')
         if state:
             try:
@@ -446,7 +409,7 @@ class PartnerState(APIView):
             except ValueError as error:
                 return JsonResponse({'Status': False, 'Errors': str(error)})
 
-        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+        return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
 
 class PartnerOrders(APIView):
@@ -459,7 +422,7 @@ class PartnerOrders(APIView):
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
         if request.user.type != 'shop':
-            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=405)
 
         order = Order.objects.filter(
             ordered_items__product_info__shop__user_id=request.user.id).exclude(state='basket').prefetch_related(
@@ -572,9 +535,6 @@ class OrderView(APIView):
         if {'id', 'contact'}.issubset(request.data):
             if request.data['id'].isdigit():
                 try:
-                    # print('order', request.data['id'], 'user', request.user.id)
-                    is_upd = Order.objects.filter(
-                        user_id=request.user.id, id=request.data['id']).first()
                     is_updated = Order.objects.filter(
                         user_id=request.user.id, id=request.data['id']).update(
                         contact_id=request.data['contact'],
