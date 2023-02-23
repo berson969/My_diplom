@@ -13,4 +13,6 @@ COPY ./netology_pd_diplom /home/netology_pd_diplom
 
 WORKDIR /home
 
-CMD celery -A netology_pd_diplom worker -l info
+RUN chown -R nobody:nogroup /home
+
+CMD celery -A netology_pd_diplom worker -l info --uid=nobody --gid=nogroup

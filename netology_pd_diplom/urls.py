@@ -18,12 +18,16 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from netology_pd_diplom import settings
 from netology_pd_diplom.swagger import schema_view
+from backend.url_basket_viewset import urlpatterns as viewset_router
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/v1/', include('backend.urls', namespace='backend')),
-    re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-
+                  path('admin/', admin.site.urls),
+                  path('api/v1/', include('backend.urls', namespace='backend')),
+                  re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0),
+                          name='schema-json'),
+                  path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+                  path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+                  path('accounts/', include('allauth.urls')),
+              ]\
+              + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)\
+              + viewset_router

@@ -28,34 +28,11 @@ class RegisterAccount(APIView):
     """
 
     # Регистрация методом POST
-    # @swagger_auto_schema(
-    #     operation_summary='register user',
-    #     request_body=openapi.SchemaRef("#/definitions/User", schema_view),
-    #         # in_=openapi.IN_QUERY,
-    #         # type=openapi.CONTENT,
-    #         # content=
-    #         # properties={
-    #         #     'first_name': openapi.Schema(type=openapi.TYPE_STRING, description='Имя пользователя'),
-    #         #     'last_name': openapi.Schema(type=openapi.TYPE_STRING, description='Фамилия пользователя'),
-    #         #     'surname': openapi.Schema(type=openapi.TYPE_STRING, description='Отчество пользователя'),
-    #         #     'email': openapi.Schema(type=openapi.TYPE_STRING, description='email пользователя'),
-    #         #     'password1': openapi.Schema(type=openapi.TYPE_STRING, description='Пароль'),
-    #         #     'password2': openapi.Schema(type=openapi.TYPE_STRING, description='Повтор пароля'),
-    #         #     'company': openapi.Schema(type=openapi.TYPE_STRING, description='Компания пользователя'),
-    #         #     'position': openapi.Schema(type=openapi.TYPE_STRING, description='Должность пользователя')
-    #         # }),
-    #     # ),
-    #     # default={'first_name': 'User','last_name': 'Last', 'surname': 'Sur',
-    #     #          'email': 'a@a.ru', 'password1': 'asdfreq23!', 'password2': 'asdfreq23!',
-    #     #          'company': 'Firma', 'position': 'manager'},
-    #     responses={200, {'Status': True}},
-    #     )
+
     def post(self, request, *args, **kwargs):
 
         # проверяем обязательные аргументы
         if {'first_name', 'last_name', 'email', 'password1', 'password2', 'company', 'position'}.issubset(request.data):
-            errors = {}
-
             # проверяем совпадение паролей
             if request.data['password1'] != request.data['password2']:
                 return JsonResponse({'Status': False, 'Errors': 'Пароли не совпадают'}, status=400)
@@ -246,6 +223,9 @@ class BasketView(APIView):
     """
 
     # получить корзину
+    @swagger_auto_schema(
+        operation_summary='Get items from basket',
+        request_body=OrderSerializer)
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -258,18 +238,9 @@ class BasketView(APIView):
         serializer = OrderSerializer(basket, many=True)
         return Response(serializer.data)
 
-    # @swagger_auto_schema(
-    #     operation_summary='Add items to basket',
-    #     # request_body=OrderItemSerializer,
-    #     request_body=openapi.Schema(
-    #         in_=openapi.IN_FORM,
-    #         type=openapi.TYPE_OBJECT,
-    #         properties={
-    #             'items': openapi.Schema(type=openapi.TYPE_STRING, description='product_info and quantity')
-    #         },
-    #         default={'items': "[{\"product_info\": 2, \"quantity\": 1}, {\"product_info\": 3, \"quantity\": 2}]"},
-    #     ),
-    # )
+    @swagger_auto_schema(
+        operation_summary='Add items to basket',
+        request_body=OrderItemSerializer)
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Login required'}, status=403)
@@ -302,9 +273,9 @@ class BasketView(APIView):
                 return JsonResponse({'Status': True, 'Создано объектов': objects_created})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
-    # @swagger_auto_schema(
-    #     operation_description='Удаление продуктов из корзины',
-    #     request_body=OrderItemSerializer)
+    @swagger_auto_schema(
+        operation_summary='Delete items from basket',
+        request_body=OrderItemSerializer)
     def delete(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -325,9 +296,9 @@ class BasketView(APIView):
                 return JsonResponse({'Status': True, 'Удалено объектов': deleted_count})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
-    # @swagger_auto_schema(
-    #     operation_description='Добавление новых позиций в корзину',
-    #     request_body=OrderItemSerializer)
+    @swagger_auto_schema(
+        operation_summary='Update items in basket',
+        request_body=OrderItemSerializer)
     def put(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -539,8 +510,7 @@ class OrderView(APIView):
                         user_id=request.user.id, id=request.data['id']).update(
                         contact_id=request.data['contact'],
                         state='new')
-                except IntegrityError as error:
-                    # print(error)
+                except IntegrityError:
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'}, statys=400)
                 else:
                     if is_updated:
@@ -576,8 +546,7 @@ class OrderView(APIView):
                     is_updated = Order.objects.filter(
                         id=request.data['id']).update(
                         state='confirmed')
-                except IntegrityError as error:
-                    # print(error)
+                except IntegrityError:
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
@@ -604,8 +573,7 @@ class StorageAdminView(APIView):
                     is_updated = Order.objects.filter(
                         user_id=order.user_id, id=order.id).update(
                         state='assembled')
-                except IntegrityError as error:
-                    # print(error)
+                except IntegrityError:
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
@@ -628,16 +596,14 @@ class StorageAdminView(APIView):
                     is_updated = Order.objects.filter(
                         id=request.data['id'], state='assembled') \
                         .prefetch_related('ordered_items__product_info') \
-                        .annotate(product_quantity=F('ordered_items__product_info__quantity') -
-                                                   F('ordered_items__quantity'),
-                                  product_id=F('ordered_items__product_info_id')
-                                  )
+                        .annotate(
+                        product_quantity=F('ordered_items__product_info__quantity') - F('ordered_items__quantity'),
+                        product_id=F('ordered_items__product_info_id'))
                     for updated in is_updated:
                         ProductInfo.objects.filter(product_id=updated.product_id) \
                             .update(quantity=updated.product_quantity)
 
-                except IntegrityError as error:
-                    # print(error)
+                except IntegrityError:
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
@@ -662,8 +628,7 @@ class StorageAdminView(APIView):
                     is_updated = Order.objects.filter(
                         user_id=request.user.id, id=request.data['id']).update(
                         state='delivered')
-                except IntegrityError as error:
-                    # print(error)
+                except IntegrityError:
                     return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                 else:
                     if is_updated:
@@ -686,8 +651,7 @@ class StorageAdminView(APIView):
                     try:
                         is_updated = Order.objects.filter(id=request.data['id']).update(
                             state='canceled')
-                    except IntegrityError as error:
-                        # print(error)
+                    except IntegrityError:
                         return JsonResponse({'Status': False, 'Errors': 'Неправильно указаны аргументы'})
                     else:
                         if is_updated:

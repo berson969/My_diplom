@@ -1,24 +1,36 @@
+from celery import Celery
+
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase, APIClient
 from django.urls import reverse
 from django.db.models import F
 
 from backend.models import User, Product, Shop, Order
-from tests.config_test import URL, PASSWORD_USER1
+from tests.config_test import URL, PASSWORD_USER1, REDIS_URL
 from tests.conftest import login_user, create_shop, get_orders
+from backend.tasks import get_price
 
 
 class PartnerTests(APITestCase):
     def setUp(self) -> None:
         self.client = APIClient()
 
+    # app = Celery('netology_pd_diplom', broker=f'{REDIS_URL}/1', backend=f'{REDIS_URL}/1')
+
     # def test_update_price(self):
     #     self.client, user = login_user(self.client)
     #     response = self.client.post(reverse('backend:partner-update'), data={'url': URL})
+    #     print(response.json())
     #     count = Product.objects.all().count()
     #     self.assertEqual(count, 4)
     #     self.assertEqual(response.status_code, 200)
     #     self.assertEqual(response.json()['Status'], True)
+    #
+    # def test_get_price(self):
+    #     self.client, user = login_user(self.client)
+    #     job_params = {'url': URL, 'user_id': user.id}
+    #     response = get_price.delay(job_params)
+    #     print(response.get())
 
     def test_update_price_without_url(self):
         self.client, user = login_user(self.client)
@@ -53,18 +65,14 @@ class PartnerTests(APITestCase):
 
     def test_get_orders(self):
         order, user = get_orders(self.client)
-        shop_id = Order.objects.filter(id=order.id)\
-            .prefetch_related('ordered_items__product_info')\
-            .annotate(
-            shop_id=F('ordered_items__product_info__shop_id')
-        ).first().shop_id
-        user = User.objects.filter(id=shop_id).first()
-        self.client.post(reverse('backend:user-login'), {
-            'email': user.email,
+        shop = Order.objects.filter(id=order.id)\
+            .prefetch_related('ordered_items__product_info__shop__user').annotate(
+            email=F('ordered_items__product_info__shop__user__email')).first()
+        response = self.client.post(reverse('backend:user-login'), {
+            'email': shop.email,
             'password': PASSWORD_USER1
         })
-        token = Token.objects.get(user__id=user.id)
-        self.client.credentials(HTTP_AUTHORIZATION='Token ' + token.key)
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + response.json()['Token'])
         response = self.client.get(reverse('backend:partner-orders'))
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.json()[0]['ordered_items'], list)

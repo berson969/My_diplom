@@ -8,7 +8,7 @@ from django.urls import reverse
 from backend.models import User, ConfirmEmailToken, ProductInfo, Contact, Order, Shop, Category, Product, Parameter, \
     ProductParameter
 from tests.config_test import URL, FIRST_NAME, LAST_NAME, SUR_NAME, EMAIL_USER, PASSWORD_USER1, \
-    PASSWORD_USER2, COMPANY, POSITION, CITY, STREET, HOUSE, STRUCTURE, BUILDING, APARTMENT, PHONE
+    PASSWORD_USER2, COMPANY, POSITION, CITY, STREET, HOUSE, STRUCTURE, BUILDING, APARTMENT, PHONE, REDIS_URL
 
 CONTACT = {
     'city': CITY,
@@ -32,7 +32,7 @@ DATA = {
 
 
 def create_user(client, type):
-    DATA['email'] = f"user_{randint(10000, 99999)}@admin.ru"
+    DATA['email'] = f"user_{randint(10000, 99999)}@admin.com"
     DATA['type'] = type
     client.post(reverse('backend:user-register'), DATA)
     user = User.objects.get(email=DATA['email'])

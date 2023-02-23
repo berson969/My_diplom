@@ -26,3 +26,4 @@ PHONE = os.getenv('PHONE', '+7 (423) 279-05-64')
 
 URL = os.getenv('URL', 'https://raw.githubusercontent.com/berson969/My_diplom/main/data/shop2.yaml')
 
+REDIS_URL = "redis://localhost:6379"

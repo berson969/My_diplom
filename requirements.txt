@@ -19,3 +19,4 @@ gunicorn==20.1.0
 drf_yasg
 celery==5.2.7
 redis
+django-allauth

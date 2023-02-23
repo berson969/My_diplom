@@ -99,6 +99,7 @@ class UserTests(APITestCase):
         user = confirm_email(self.client)
         response = self.client.post(reverse('backend:user-login'),
                                     {'email': user.email, 'password': 'password'})
+        # print(response.json())
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()['Status'], False)
         self.assertEqual(response.json()['Errors'], 'Не удалось авторизовать')
