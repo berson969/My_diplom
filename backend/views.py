@@ -8,7 +8,8 @@ from django.db import IntegrityError
 from django.db.models import Q, Sum, F
 from django.http import JsonResponse
 from django_rest_passwordreset.views import ResetPasswordConfirm
-from drf_yasg.utils import swagger_auto_schema
+from drf_spectacular.utils import extend_schema
+# from drf_yasg.utils import swagger_auto_schema
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -113,9 +114,9 @@ class AccountDetails(APIView):
         return Response(serializer.data)
 
     # Редактирование методом POST
-    @swagger_auto_schema(
-        operation_summary='Редактирование users',
-        request_body=UserSerializer)
+    @extend_schema(
+        summary='Редактирование users',
+        request=UserSerializer)
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -223,9 +224,10 @@ class BasketView(APIView):
     """
 
     # получить корзину
-    @swagger_auto_schema(
-        operation_summary='Get items from basket',
-        request_body=OrderSerializer)
+    @extend_schema(
+        description='Method GET basket',
+        summary='Get items from basket',
+        request=OrderSerializer)
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -238,9 +240,9 @@ class BasketView(APIView):
         serializer = OrderSerializer(basket, many=True)
         return Response(serializer.data)
 
-    @swagger_auto_schema(
-        operation_summary='Add items to basket',
-        request_body=OrderItemSerializer)
+    @extend_schema(
+        summary='Add items to basket',
+        request=OrderItemSerializer)
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Login required'}, status=403)
@@ -273,9 +275,9 @@ class BasketView(APIView):
                 return JsonResponse({'Status': True, 'Создано объектов': objects_created})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
-    @swagger_auto_schema(
-        operation_summary='Delete items from basket',
-        request_body=OrderItemSerializer)
+    @extend_schema(
+        summary='Delete items from basket',
+        request=OrderItemSerializer)
     def delete(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
@@ -296,9 +298,9 @@ class BasketView(APIView):
                 return JsonResponse({'Status': True, 'Удалено объектов': deleted_count})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
-    @swagger_auto_schema(
-        operation_summary='Update items in basket',
-        request_body=OrderItemSerializer)
+    @extend_schema(
+        summary='Update items in basket',
+        request=OrderItemSerializer)
     def put(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)

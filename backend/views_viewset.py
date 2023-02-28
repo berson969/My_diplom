@@ -1,6 +1,4 @@
 from django.db import IntegrityError
-from django.utils.decorators import method_decorator
-from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, permissions
 from django.db.models import Q, Sum, F
 from rest_framework.decorators import action
@@ -21,9 +19,6 @@ class BasketViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = [OrderSerializer, OrderItemSerializer, ]
 
-    @method_decorator(name='create', decorator=swagger_auto_schema(
-        operation_summary="Create and Update items in basket",
-    ))
     def create(self, request, *args, **kwargs):
         items_sting = request.data.get('items')
         print(request.user.id)
@@ -54,9 +49,6 @@ class BasketViewSet(viewsets.ModelViewSet):
                 return JsonResponse({'Status': True, 'Создано объектов': objects_created})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
-    @method_decorator(name='update_basket', decorator=swagger_auto_schema(
-        operation_summary="Update items in basket",
-    ))
     @action(methods=['put'], detail=False, url_path='update')
     def update_basket(self, request):
         items_sting = request.data.get('items')
@@ -80,9 +72,6 @@ class BasketViewSet(viewsets.ModelViewSet):
                 return JsonResponse({'Status': True, 'Обновлено объектов': objects_updated})
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'}, status=400)
 
-    @method_decorator(name='destroy_product', decorator=swagger_auto_schema(
-        operation_summary="Delete items from basket",
-    ))
     @action(methods=['delete'], detail=False, url_path='delete')
     def destroy_product(self, request):
         items_sting = request.data.get('items')

@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'django_rest_passwordreset',
-    'drf_yasg',
+    'drf_spectacular',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -166,6 +166,7 @@ REST_FRAMEWORK = {
         'anon': '1000/day',
         'user': '10000/day'
     },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # Celery configuration:
@@ -176,18 +177,13 @@ CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
-# Swagger settings
-SWAGGER_SETTINGS = {
-    'DEFAULT_INFO': 'netology_pd_diplom.urls.api_info',
-    'USE_SESSION_AUTH': False,
-    'SECURITY_DEFINITIONS': {
-        'Bearer': {
-            'type': 'apiKey',
-            'name': 'Authorization',
-            'in': 'header'
-        },
 
-    },
+# drf-spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ShopBackend API',
+    'CONTACT': 'berson969@gmail.com',
+    'DESCRIPTION': 'AutoSchema for final diplom project "Python Developer"',
+    'VERSION': '1.1',
 }
 
 SITE_ID = 1
